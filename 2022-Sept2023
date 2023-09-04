@@ -21,3 +21,725 @@ from sklearn.model_selection import StratifiedKFold, train_test_split, GridSearc
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
+
+
+df = pd.read_csv("PX.csv")
+df.head(50)
+
+df['Momento'] = pd.to_datetime(df['Momento'])
+df = df[df['Momento'] >= pd.to_datetime('2022-01-01')]
+df = df[df['Momento'] <= pd.to_datetime('2023-08-01')]
+df
+
+df_phd_data_grouped = df[(df['Confianza'] == 0)]
+
+df_phd_data_grouped= df_phd_data_grouped.groupby(['Tag','Momento']).agg({'Valor':['min','median', 'max']}, {'Momento':['AVG_DATE']})
+
+#Porcentaje e Identificación de outliers
+
+
+s = ['01PHD.PRF079.PV', '01PHD.PRP038.PV', '01PHD.PAREX.L2A', '01PHD.PRT230.PV',
+ '01PHD.SUAA236.PV', '01PHD.PRF186.PV', '01PHD.PRP016.PV', '01PHD.PRF073.PV',
+ '01PHD.PRF128.PV', '01PHD.PRF160.PV', '01PHD.PRU154.PV', '01PHD.PRSL014.OP', '01PHD.PRF114.PV', '01PHD.SUAA235.PV',
+ '01PHD.PRP606.PV', '01PHD.SUAA238.PV',
+ '01PHD.PRT212.PV', '01PHD.PRP093.PV', '01PHD.PRLI003.PV',
+   '01PHD.HLF215.PV', '01PHD.PRF160.OP', '01PHD.PRAA801.PV']
+
+agg_ = 'median'
+
+contador = 0
+df_quant_values=[]
+initial_outliers_calc=[]
+initial_outliers_perc=[]
+
+for i in s:  
+    #cálculo de límite inferior y superior, considerando el rango intercuartílitico.
+    df_quant = df_phd_data_grouped.loc[i]['Valor'].quantile([0.25,0.75])[agg_]    
+    df_quant.loc['iqr'] = df_quant.loc[0.75] - df_quant.loc[0.25]
+    df_quant.loc['lbound'] = df_quant.loc[0.25] - 1.5 * df_quant.loc['iqr'] #1.5=whis
+    df_quant.loc['ubound'] = df_quant.loc[0.75] + 1.5 * df_quant.loc['iqr'] #1.5=whis
+    df_quant.loc['name'] = i
+    df_quant_values.append(df_quant)
+    
+    
+    #comparación de valores con los límites inferior y superior calculados previamente.      
+    outliers = df_phd_data_grouped.loc[i]['Valor'][(df_phd_data_grouped.loc[i]['Valor'][agg_]<df_quant.loc['lbound'])|(df_phd_data_grouped.loc[i]['Valor']['median']>df_quant.loc['ubound'])][agg_]
+    outliers.loc['name']=i
+    
+    #porcentaje de datos fuera de rango iqr
+    outliers_count=outliers.size
+    outliers_percentage=(outliers_count/np.size(df_phd_data_grouped.loc[i]['Valor'][agg_].values))*100
+    
+    #obtención de la lista con los valores finales acumulados para cada sensor (resultado final numérico del bucle for)
+    initial_outliers_calc.append(outliers)
+    initial_outliers_perc.append(outliers_percentage)
+
+initial_outliers_perc=pd.DataFrame(initial_outliers_perc)
+
+initial_outliers_perc['sensor']= s
+initial_outliers_perc_format=initial_outliers_perc.rename(columns={0: "percentage"})
+initial_outliers_perc_format.head(39)
+
+#paso opcional: formato DataFrame para el array df_quant_values
+df_quant_values=pd.DataFrame(df_quant_values)
+df_quant_values.head(40)
+
+#Acotamiento según Upper y Lower Bound
+
+agg_ = 'median'
+
+#parex1
+
+df_phd_data_grouped_01PHDPRF079=df_phd_data_grouped.loc['01PHD.PRF079.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF079.PV']['Valor'][agg_]<
+28.34827) & (df_phd_data_grouped.loc['01PHD.PRF079.PV']['Valor'][agg_]>15.5118974)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF079['name']='01PHD.PRF079.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDPRP038=df_phd_data_grouped.loc['01PHD.PRP038.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRP038.PV']['Valor'][agg_]<
+0.0218) & (df_phd_data_grouped.loc['01PHD.PRP038.PV']['Valor'][agg_]>0.00678)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRP038['name']='01PHD.PRP038.PV' #contrastar con IPPç
+
+df_phd_data_grouped_PAREX=df_phd_data_grouped.loc['01PHD.PAREX.L2A']['Valor'][(df_phd_data_grouped.loc['01PHD.PAREX.L2A']['Valor'][agg_]<
+0.62) & (df_phd_data_grouped.loc['01PHD.PAREX.L2A']['Valor'][agg_]>0.4500)]#límites boxplot
+df_phd_data_grouped_PAREX['name']='01PHD.PAREX.L2A'
+df_phd_data_grouped_PAREX
+
+df_phd_data_grouped_01PHDPRT230=df_phd_data_grouped.loc['01PHD.PRT230.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRT230.PV']['Valor'][agg_]<
+142.48378) & (df_phd_data_grouped.loc['01PHD.PRT230.PV']['Valor'][agg_]>139.82652)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRT230['name']='01PHD.PRT230.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDSUAA236=df_phd_data_grouped.loc['01PHD.SUAA236.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.SUAA236.PV']['Valor'][agg_]<
+257) & (df_phd_data_grouped.loc['01PHD.SUAA236.PV']['Valor'][agg_]>-97)]#límites boxplot
+df_phd_data_grouped_01PHDSUAA236['name']='01PHD.SUAA236.PV'
+df_phd_data_grouped_01PHDSUAA236
+
+df_phd_data_grouped_01PHDPRF186=df_phd_data_grouped.loc['01PHD.PRF186.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF186.PV']['Valor'][agg_]<
+179) & (df_phd_data_grouped.loc['01PHD.PRF186.PV']['Valor'][agg_]>97.1892)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF186['name']='01PHD.PRF186.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDPRP016=df_phd_data_grouped.loc['01PHD.PRP016.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRP016.PV']['Valor'][agg_]<
+2.56) & (df_phd_data_grouped.loc['01PHD.PRP016.PV']['Valor'][agg_]>1.35)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRP016['name']='01PHD.PRP016.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDPRF073=df_phd_data_grouped.loc['01PHD.PRF073.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF073.PV']['Valor'][agg_]<
+37) & (df_phd_data_grouped.loc['01PHD.PRF073.PV']['Valor'][agg_]>24)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF073['name']='01PHD.PRF073.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRF128=df_phd_data_grouped.loc['01PHD.PRF128.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF128.PV']['Valor'][agg_]<
+560.74521) & (df_phd_data_grouped.loc['01PHD.PRF128.PV']['Valor'][agg_]>330.09601)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF128['name']='01PHD.PRF128.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRSL014=df_phd_data_grouped.loc['01PHD.PRSL014.OP']['Valor'][(df_phd_data_grouped.loc['01PHD.PRSL014.OP']['Valor'][agg_]<
+42) & (df_phd_data_grouped.loc['01PHD.PRSL014.OP']['Valor'][agg_]>25)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRSL014['name']='01PHD.PRSL014.OP' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRU154=df_phd_data_grouped.loc['01PHD.PRU154.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRU154.PV']['Valor'][agg_]<
+150.90461) & (df_phd_data_grouped.loc['01PHD.PRU154.PV']['Valor'][agg_]>137.69685)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRU154['name']='01PHD.PRU154.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRF160=df_phd_data_grouped.loc['01PHD.PRF160.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF160.PV']['Valor'][agg_]<
+29) & (df_phd_data_grouped.loc['01PHD.PRF160.PV']['Valor'][agg_]>6.3)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF160['name']='01PHD.PRF160.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRLI003=df_phd_data_grouped.loc['01PHD.PRLI003.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRLI003.PV']['Valor'][agg_]<
+5000) & (df_phd_data_grouped.loc['01PHD.PRLI003.PV']['Valor'][agg_]>-100)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRLI003['name']='01PHD.PRLI003.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRF114=df_phd_data_grouped.loc['01PHD.PRF114.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF114.PV']['Valor'][agg_]<
+618) & (df_phd_data_grouped.loc['01PHD.PRF114.PV']['Valor'][agg_]>351)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF114['name']='01PHD.PRF114.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDSUAA235=df_phd_data_grouped.loc['01PHD.SUAA235.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.SUAA235.PV']['Valor'][agg_]<
+1.56) & (df_phd_data_grouped.loc['01PHD.SUAA235.PV']['Valor'][agg_]>0.14)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDSUAA235['name']='01PHD.SUAA235.PV' #contrastar con IPP 
+
+#df_phd_data_grouped_01PHDPRP606=df_phd_data_grouped.loc['01PHD.PRP606.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRP606.PV']['Valor'][agg_]<
+#6) & (df_phd_data_grouped.loc['01PHD.PRP606.PV']['Valor'][agg_]>0)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+#df_phd_data_grouped_01PHDPRP606['name']='01PHD.PRP606.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDSUAA238=df_phd_data_grouped.loc['01PHD.SUAA238.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.SUAA238.PV']['Valor'][agg_]<
+9.08) & (df_phd_data_grouped.loc['01PHD.SUAA238.PV']['Valor'][agg_]>2.9)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDSUAA238['name']='01PHD.SUAA238.PV' #contrastar con IPP
+
+#df_phd_data_grouped_01PHDPRT212=df_phd_data_grouped.loc['01PHD.PRT212.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRT212.PV']['Valor'][agg_]<
+#183) & (df_phd_data_grouped.loc['01PHD.PRT212.PV']['Valor'][agg_]>174)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+#df_phd_data_grouped_01PHDPRT212['name']='01PHD.PRT212.PV' #contrastar con IPP 
+
+#df_phd_data_grouped_01PHDPRP093=df_phd_data_grouped.loc['01PHD.PRP093.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRP093.PV']['Valor'][agg_]<
+#38.27) & (df_phd_data_grouped.loc['01PHD.PRP093.PV']['Valor'][agg_]>6.2)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+#df_phd_data_grouped_01PHDPRP093['name']='01PHD.PRP093.PV' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDPRAA801=df_phd_data_grouped.loc['01PHD.PRAA801.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.PRAA801.PV']['Valor'][agg_]<
+185.9) & (df_phd_data_grouped.loc['01PHD.PRAA801.PV']['Valor'][agg_]>3.77)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRAA801['name']='01PHD.PRAA801.PV' #contrastar con IPP
+
+df_phd_data_grouped_01PHDPRF160P=df_phd_data_grouped.loc['01PHD.PRF160.OP']['Valor'][(df_phd_data_grouped.loc['01PHD.PRF160.OP']['Valor'][agg_]<
+2) & (df_phd_data_grouped.loc['01PHD.PRF160.OP']['Valor'][agg_]>-20)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDPRF160P['name']='01PHD.PRF160.OP' #contrastar con IPP 
+
+df_phd_data_grouped_01PHDHLF215=df_phd_data_grouped.loc['01PHD.HLF215.PV']['Valor'][(df_phd_data_grouped.loc['01PHD.HLF215.PV']['Valor'][agg_]<
+20000) & (df_phd_data_grouped.loc['01PHD.HLF215.PV']['Valor'][agg_]>-3000)] #límites basados en gráfica temporal (los de boxplot eran -353.687500 y 20176.312500)
+df_phd_data_grouped_01PHDHLF215['name']='01PHD.HLF215.PV' #contrastar con IPP 
+
+
+
+
+
+
+
+df_phd_data_cleaned=pd.concat([
+    df_phd_data_grouped_01PHDPRF079,
+    df_phd_data_grouped_01PHDPRP038,
+    df_phd_data_grouped_PAREX,
+    df_phd_data_grouped_01PHDPRT230,
+    df_phd_data_grouped_01PHDSUAA236,
+    df_phd_data_grouped_01PHDPRF186,
+    df_phd_data_grouped_01PHDPRP016,
+    df_phd_data_grouped_01PHDPRF073,
+    df_phd_data_grouped_01PHDPRF128,
+    df_phd_data_grouped_01PHDPRF160,
+    df_phd_data_grouped_01PHDPRU154,
+    df_phd_data_grouped_01PHDPRSL014,
+    df_phd_data_grouped_01PHDPRLI003,
+    df_phd_data_grouped_01PHDPRF114,
+    df_phd_data_grouped_01PHDSUAA235,
+    df_phd_data_grouped_01PHDSUAA238,
+    df_phd_data_grouped_01PHDPRF160P,
+    df_phd_data_grouped_01PHDPRAA801,
+    df_phd_data_grouped_01PHDHLF215
+
+
+
+
+])
+
+df_phd_data_cleaned
+
+
+# Pivotado del dataset para tener los Tags como variables y no como instancias
+df_phd_data_cleaned_pivot = df_phd_data_cleaned.pivot_table(index = 'Momento', values=('median'), columns = 'name')
+df_phd_data_cleaned_pivot
+
+df_phd_data_cleaned_pivot.columns
+df_phd_data_cleaned_pivot.isnull().mean() * 100
+
+#Agrupación de la media de los valores cada 10 minutos de las variables
+
+import datetime 
+df_phd_data_cleaned_pivot.index = pd.to_datetime(df_phd_data_cleaned_pivot.index)
+def round_10min(timestamp): #promedio cada 10 min para evitar el ruido que puede ir implícito en las señales
+    
+    return (timestamp.replace(second=0, microsecond=0, minute=0, hour=timestamp.hour)
+               +datetime.timedelta(minutes=(timestamp.minute//10)*10))
+
+df_phd_data_cleaned_pivot.index = pd.to_datetime(df_phd_data_cleaned_pivot.index)
+
+df_10 = df_phd_data_cleaned_pivot.groupby(round_10min).mean()
+
+# Renombrar el índice como "Momento"
+df_10.index.name = "Momento"
+
+# Mostrar el DataFrame xd
+df_10
+
+df_10.isnull().mean() * 100
+
+
+# IMPLEMENTACIÓN DE LOS DATOS DE LABORATORIO
+
+labdata = pd.read_csv("labdata2020.csv")
+labdata['Momento'] = pd.to_datetime(labdata['Momento'])
+labdata = labdata[labdata['Momento'] >= pd.to_datetime('2022-01-01')]
+labdata = labdata[['Momento', '01ILB.U7K02.GLT', '01ILB.U7K02.GM1', '01ILB.U7K01.GLT', '01ILB.U7K01.GM1']]
+#labdata = labdata[['Momento', '01ILB.U7K02.GM1']]
+labdata
+
+labdata.describe()
+
+#Mergeo datasets
+
+df_10.index = pd.to_datetime(df_10.index)
+labdata.index = pd.to_datetime(labdata.index)
+merged_df = pd.merge(df_10, labdata, on='Momento')
+merged_df
+
+merged_df.columns
+merged_df.isnull().mean() * 100
+
+#eliminación de variables con mayor de 40% nulos
+
+valores_nulos = [100*merged_df[col].isna().sum()/merged_df.shape[0] for col in merged_df.columns]
+variables_eliminar = [col for col, valor_nulo in zip(merged_df.columns, valores_nulos) if valor_nulo > 40]
+merged_df = merged_df.drop(variables_eliminar, axis=1)
+merged_df.isnull().mean() * 100
+
+data = merged_df
+data
+
+#creación de variables sinteticas
+
+# Inicializa la columna "ultima_cambio" con NaN
+data['ultima_cambio'] = pd.NaT
+
+
+# Itera a través del DataFrame y marca la última vez que cambió "PAREX.L2A"
+last_value = None
+for index, row in data.iterrows():
+    if row['01PHD.PAREX.L2A'] != last_value:
+        data.at[index, 'ultima_cambio'] = row['Momento']
+        last_value = row['01PHD.PAREX.L2A']
+
+# Rellena los valores NaN en "ultima_cambio" con la última fecha disponible
+data['ultima_cambio'].fillna(method='ffill', inplace=True)
+
+data['Ultimo Cambio'] = ((data['Momento'] - data['ultima_cambio']).dt.total_seconds() / 3600).astype(int)
+
+# Inicializa la columna 'Cambio en Valor' con NaN
+data['Cambio en Valor'] = None
+
+# Inicializa las variables de seguimiento
+last_value = None
+last_change_index = None
+
+# Itera a través del DataFrame
+for index, row in data.iterrows():
+    if last_value is None:
+        # En la primera iteración, simplemente registra el valor actual y continúa
+        last_value = row['01PHD.PAREX.L2A']
+        continue
+
+    if row['01PHD.PAREX.L2A'] != last_value:
+        # Si el valor actual es diferente del valor anterior, registra la diferencia
+        data.at[index, 'Cambio en Valor'] = row['01PHD.PAREX.L2A'] - last_value
+        last_change_index = index  # Registra el índice de la última vez que cambió
+        last_value = row['01PHD.PAREX.L2A']
+    else:
+        # Si el valor actual es igual al valor anterior, calcula la diferencia desde la última vez que cambió
+        data.at[index, 'Cambio en Valor'] = row['01PHD.PAREX.L2A'] - data.at[last_change_index, '01PHD.PAREX.L2A']
+
+# Rellena los valores NaN en "Cambio en Valor" con ceros
+data['Cambio en Valor'].fillna(0, inplace=True)
+
+columnas_seleccionadas = data[['Momento', 'Ultimo Cambio', '01PHD.PAREX.L2A', 'ultima_cambio', 'Cambio en Valor']]
+columnas_seleccionadas
+
+#otras variables
+
+import math
+data['nueva_var'] = ((data[( '01PHD.PRF073.PV')] * (data[( '01PHD.PAREX.L2A')])) / data[( '01PHD.PRT230.PV')]) 
+data['nueva_var2'] =  -0.001* (data['01PHD.SUAA236.PV']) + 99.543
+data['nueva_var28'] =  0.04* (data['01PHD.SUAA238.PV']) + 99.3
+data['nueva_var3'] =  1.1559* (data['01PHD.PAREX.L2A']) + 98.906
+
+data['nueva_var4'] =   (2.630 * data['nueva_var3']) + (0.003* data['01PHD.PRF073.PV']) - 162.305
+
+plt.scatter( data['nueva_var3'], data[('01ILB.U7K02.GM1')])#plt.ylim(99.4,99.65)
+plt.xlabel('Variable Síntetica')
+plt.ylabel('Variable Objetivo') 
+plt.title('Gráfico de dispersión entre Variable 1 y Variable 2')
+plt.show()
+
+#Correlación de variables 
+
+import plotly.express as px
+
+correlation_df = data.corr(method='pearson')
+correlation_matrix = data.corr()
+
+correlations = correlation_matrix['01ILB.U7K02.GM1'].drop('01ILB.U7K02.GM1')  # Excluir la correlación consigo misma
+
+# Ordenar las correlaciones de forma descendente
+sorted_correlations = correlations.abs().sort_values(ascending=False)
+
+print("Variables más correlacionadas con '01ILB.U7K02.GM1':")
+print(sorted_correlations.head(20))  
+
+data.isnull().mean() * 100
+
+#Creación del Modelo
+
+data = data.dropna()
+data = data.set_index('Momento', drop=True)
+data
+
+df_train, df_test = train_test_split(data, test_size=0.2, random_state=42) 
+df_train.sort_index(inplace=True)
+df_test.sort_index(inplace=True)
+
+model_vars = {
+    "y": '01ILB.U7K02.GM1',
+    "x": [  '01PHD.PAREX.L2A', '01PHD.PRAA801.PV', '01PHD.PRF073.PV',
+       '01PHD.PRF079.PV', '01PHD.PRF114.PV', '01PHD.PRF128.PV',
+       '01PHD.PRF160.OP', '01PHD.PRF186.PV', 
+       '01PHD.PRP016.PV', '01PHD.PRP038.PV', '01PHD.PRSL014.OP',
+       '01PHD.PRT230.PV',  '01PHD.SUAA235.PV',
+       'nueva_var', 'nueva_var2', 'nueva_var28',
+        'nueva_var4', 'Ultimo Cambio'
+                     ],
+    "z": 'Momento'
+                  
+                 
+                   
+    }
+
+X_train, y_train =df_train[model_vars['x']].values, df_train[model_vars['y']].values
+X_test, y_test = df_test[model_vars['x']].values, df_test[model_vars['y']].values
+
+import xgboost as xgb
+import lightgbm as lgb
+from catboost import CatBoostRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, VotingRegressor
+
+# Inicializar todos los modelos con los parámetros por defecto
+model_rf = RandomForestRegressor()
+model_gb = GradientBoostingRegressor()
+model_xgb = xgb.XGBRegressor()
+model_lgb = lgb.LGBMRegressor()
+model_cat = CatBoostRegressor()
+model_ada = AdaBoostRegressor()
+model_voting = VotingRegressor(estimators=[('rf', model_rf), ('gb', model_gb), ('xgb', model_xgb), ('lgb', model_lgb), ('cat', model_cat), ('ada', model_ada)])
+
+
+
+# Entrenar los modelos en el conjunto de entrenamiento
+model_rf.fit(X_train, y_train)
+model_gb.fit(X_train, y_train)
+model_xgb.fit(X_train, y_train)
+model_lgb.fit(X_train, y_train)
+model_cat.fit(X_train, y_train)
+model_ada.fit(X_train, y_train)
+model_voting.fit(X_train, y_train)
+
+# Predecir en el conjunto de prueba
+pred_rf = model_rf.predict(X_test)
+pred_gb = model_gb.predict(X_test)
+pred_xgb = model_xgb.predict(X_test)
+pred_lgb = model_lgb.predict(X_test)
+pred_cat = model_cat.predict(X_test)
+pred_ada = model_ada.predict(X_test)
+pred_voting = model_voting.predict(X_test)
+
+# Calcular métricas para cada modelo
+mse_rf = mean_squared_error(y_test, pred_rf)
+mae_rf = mean_absolute_error(y_test, pred_rf)
+r2_rf = r2_score(y_test, pred_rf)
+
+mse_gb = mean_squared_error(y_test, pred_gb)
+mae_gb = mean_absolute_error(y_test, pred_gb)
+r2_gb = r2_score(y_test, pred_gb)
+
+mse_xgb = mean_squared_error(y_test, pred_xgb)
+mae_xgb = mean_absolute_error(y_test, pred_xgb)
+r2_xgb = r2_score(y_test, pred_xgb)
+
+mse_lgb = mean_squared_error(y_test, pred_lgb)
+mae_lgb = mean_absolute_error(y_test, pred_lgb)
+r2_lgb = r2_score(y_test, pred_lgb)
+
+mse_cat = mean_squared_error(y_test, pred_cat)
+mae_cat = mean_absolute_error(y_test, pred_cat)
+r2_cat = r2_score(y_test, pred_cat)
+
+mse_ada = mean_squared_error(y_test, pred_ada)
+mae_ada = mean_absolute_error(y_test, pred_ada)
+r2_ada = r2_score(y_test, pred_ada)
+
+mse_voting = mean_squared_error(y_test, pred_voting)
+mae_voting = mean_absolute_error(y_test, pred_voting)
+r2_voting = r2_score(y_test, pred_voting)
+
+# Mostrar los resultados para cada modelo
+print("Random Forest:")
+print("Error Cuadrático Medio (MSE):", mse_rf)
+print("Error Absoluto Medio (MAE):", mae_rf)
+print("Coeficiente de Determinación R²:", r2_rf)
+print()
+
+print("Gradient Boosting:")
+print("Error Cuadrático Medio (MSE):", mse_gb)
+print("Error Absoluto Medio (MAE):", mae_gb)
+print("Coeficiente de Determinación R²:", r2_gb)
+print()
+
+print("XGBoost:")
+print("Error Cuadrático Medio (MSE):", mse_xgb)
+print("Error Absoluto Medio (MAE):", mae_xgb)
+print("Coeficiente de Determinación R²:", r2_xgb)
+print()
+
+print("LightGBM:")
+print("Error Cuadrático Medio (MSE):", mse_lgb)
+print("Error Absoluto Medio (MAE):", mae_lgb)
+print("Coeficiente de Determinación R²:", r2_lgb)
+print()
+
+print("CatBoost:")
+print("Error Cuadrático Medio (MSE):", mse_cat)
+print("Error Absoluto Medio (MAE):", mae_cat)
+print("Coeficiente de Determinación R²:", r2_cat)
+print()
+
+print("AdaBoost:")
+print("Error Cuadrático Medio (MSE):", mse_ada)
+print("Error Absoluto Medio (MAE):", mae_ada)
+print("Coeficiente de Determinación R²:", r2_ada)
+print()
+
+print("Voting Regressor:")
+print("Error Cuadrático Medio (MSE):", mse_voting)
+print("Error Absoluto Medio (MAE):", mae_voting)
+print("Coeficiente de Determinación R²:", r2_voting)
+
+from matplotlib.pyplot import figure
+figure(figsize=(10,5),dpi=80)
+plt.plot(df_test.index, pred_cat, '--o', linewidth=1, label='model_cat')
+
+plt.plot(df_test.index, y_test, '--o', linewidth=1, label = 'real')
+plt.legend()
+plt.title(f"Model Cat Boost")
+plt.xlabel('momentum')
+plt.ylabel(model_vars['y'])
+plt.show()
+
+from matplotlib.pyplot import figure
+figure(figsize=(10,5),dpi=80)
+plt.plot(df_test.index, pred_xgb, '--o', linewidth=1, label='model')
+plt.plot(df_test.index, y_test, '--o', linewidth=1, label = 'real')
+plt.legend()
+plt.title(f"Model Cat Boost")
+plt.xlabel('momentum')
+plt.ylabel(model_vars['y'])
+plt.show()
+
+from matplotlib.pyplot import figure
+figure(figsize=(10,5),dpi=80)
+plt.plot(df_test.index, pred_rf, '--o', linewidth=1, label='model_rf')
+plt.plot(df_test.index, y_test, '--o', linewidth=1, label = 'real')
+plt.legend()
+plt.title(f"Model Cat Boost")
+plt.xlabel('momentum')
+plt.ylabel(model_vars['y'])
+plt.show()
+
+from matplotlib.pyplot import figure
+figure(figsize=(10,5),dpi=80)
+plt.plot(df_test.index, pred_lr, '--o', linewidth=1, label='model_cat')
+plt.plot(df_test.index, y_test, '--o', linewidth=1, label = 'real')
+plt.legend()
+plt.title(f"Model Cat Boost")
+plt.xlabel('momentum')
+plt.ylabel(model_vars['y'])
+plt.show()
+
+#Ensemble 
+
+from sklearn.ensemble import VotingRegressor
+
+# Supongamos que tienes los modelos model_rf, model_gb y model_lr entrenados
+
+# Asignar pesos personalizados a los modelos base
+weights = [0.3,  0.1, 0.6]  # Por ejemplo, asignamos un peso de 0.4 al modelo_rf, 0.3 a model_gb y 0.3 a model_lr
+
+# Crear el ensemble con pesos personalizados
+weighted_ensemble = VotingRegressor(
+    estimators=[
+        ('rf', model_1),
+        ('gb', model_xgb),
+        ('lr', model_cat)
+    ],
+    weights=weights
+)
+
+# Entrenar el ensemble con pesos personalizados
+weighted_ensemble.fit(X_train, y_train)
+
+# Predecir en el conjunto de prueba
+pred_weighted = weighted_ensemble.predict(X_test)
+
+mse = mean_squared_error(y_test, pred_weighted)
+mae = mean_absolute_error(y_test, pred_weighted)
+r2 = r2_score(y_test, pred_weighted)
+
+# Mostrar los resultados
+print("Error Cuadrático Medio (MSE):", mse)
+print("Error Absoluto Medio (MAE):", mae)
+print("Coeficiente de Determinación R²:", r2)
+
+from matplotlib.pyplot import figure
+figure(figsize=(10,5),dpi=80)
+plt.plot(df_test.index, pred_weighted, '--o', linewidth=1, label='model')
+plt.plot(df_test.index, y_test, '--o', linewidth=1, label = 'real')
+plt.legend()
+plt.title(f"Model {model_vars['y']} residues")
+#plt.ylim(99.37, 99.68)
+plt.xlabel('Fecha')
+plt.ylabel(model_vars['y'])
+plt.show()
+
+from sklearn.model_selection import cross_val_score
+
+# Realizar validación cruzada K-Fold con 5 particiones
+cv_scores = cross_val_score(weighted_ensemble, X_train, y_train, cv=10, scoring='neg_mean_absolute_error')
+
+# Convertir los puntajes negativos de MAE a MAE positivo
+mae_scores = -cv_scores
+
+# Imprimir los resultados de la validación cruzada
+print("Resultados de validación cruzada - MAE:")
+print(mae_scores)
+print("Promedio MAE:", np.mean(mae_scores))
+
+cv_scores = cross_val_score(weighted_ensemble, X_train, y_train, cv=10, scoring='neg_mean_squared_error')
+
+# Convertir los puntajes negativos de MSE a MSE positivo
+mse_scores = -cv_scores
+
+# Imprimir los resultados de la validación cruzada
+print("Resultados de validación cruzada - MSE:")
+print(mse_scores)
+print("Promedio MSE:", np.mean(mse_scores))
+
+from sklearn.model_selection import cross_val_predict
+
+y_pred = cross_val_predict(weighted_ensemble, X_train, y_train, cv=10)
+
+# Calcular el R2 comparando las predicciones con las etiquetas reales
+r2 = r2_score(y_train, y_pred)
+
+# Imprimir el resultado del R2
+print("Coeficiente de determinación R2:", r2)
+
+#Comprobación de resultados en tiempo real
+
+df_C = pd.read_csv("1b0e2b78-b34b-7f33-a610-102c2bddf700.csv")
+df_C.columns
+df_C['Momento'] = pd.to_datetime(df_C['Momento'])
+unique_tags = df_C['Tag'].unique()
+print(unique_tags)
+df_C
+
+from datetime import timedelta
+df_phd_data_grouped_C = df_C[(df_C['Confianza'] == 0) ]
+
+df_phd_data_grouped_C['Momento'] = df_phd_data_grouped_C['Momento'].apply(lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M"))
+
+def round_10min(timestamp): #promedio cada 10 min para evitar el ruido que puede ir implícito en las señales
+    
+    return (timestamp.replace(second=0, microsecond=0, minute=0, hour=timestamp.hour)
+               +datetime.timedelta(minutes=(timestamp.minute//10)*10))
+
+df_phd_data_grouped_C.loc[:,'Momento'] = df_phd_data_grouped_C['Momento'].map(round_10min)
+df_phd_data_grouped_C.head()
+
+df_datatotal_grouped_C=df_phd_data_grouped_C.groupby(['Tag','Momento']).agg({'Valor':['median']})
+df_datatotal_grouped_C
+
+df_datatotal_test_pivot_C=df_datatotal_grouped_C.pivot_table(index='Momento', values='Valor', columns='Tag')
+df_datatotal_test_pivot_C
+
+valores_nulos = [100*df_datatotal_test_pivot_C[col].isna().sum()/df_datatotal_test_pivot_C.shape[0] for col in df_datatotal_test_pivot_C.columns]
+df_datatotal_test_pivot_C.isnull().mean() * 100
+
+#Datos de lab
+px_C = pd.read_csv("labdataAgos.csv")
+px_C = px_C[px_C['co_r_status'] == 'A']
+px_C['fx_s_sampled_date'] = pd.to_datetime(px_C['fx_s_sampled_date'])
+
+df_C = px_C.rename(columns={'qt_r_value': 'Valor', 'datalake_mod_date': 'AVG_DATE', 'co_id_serie': 'name',
+                                                'fx_s_sampled_date': 'Momento'})
+
+df_C = df_C.pivot_table( index='Momento', values='Valor', columns = 'name')
+df_C.head()
+df_C['Momento']=pd.to_datetime(df_C.index)
+
+import datetime
+
+def round_10mi(timestamp): #promedio cada 10 min para evitar el ruido que puede ir implícito en las señales
+    
+    return (timestamp.replace(second=0, microsecond=0, minute=0, hour=timestamp.hour)
+               +datetime.timedelta(minutes=(timestamp.minute//10)*10))
+
+df_C['Momento']=pd.to_datetime(df_C['Momento'])
+
+df_10_C = df_C.groupby(round_10mi).mean()
+
+# Renombrar el índice como "Momento"
+df_10_C.index.name = "Momento"
+
+# Mostrar el DataFrame xd
+labdata_C = df_10_C
+
+#Mergeo de datos lab con variables en linea
+df_datatotal_test_pivot_C.index = pd.to_datetime(df_datatotal_test_pivot_C.index)
+labdata_C.index = pd.to_datetime(labdata_C.index)
+merged_df_C = pd.merge(df_datatotal_test_pivot_C, labdata_C, on='Momento')
+merged_df_C.isnull().mean() * 100
+
+merged_df_C = merged_df_C.drop(columns=[('median','01PHD.PRF160.PV')])
+merged_df_C.columns
+
+def adjust_column_name(column_name):
+    if column_name[0] == 'median':
+        return column_name[1]
+    return column_name[0]
+
+# Aplicamos la función de mapeo para ajustar los nombres de las columnas
+merged_df_C.columns = [adjust_column_name(column) for column in merged_df_C.columns]
+
+merged_df_C.rename(columns={'0': '01ILB.U7K02.GM1'}, inplace=True)
+
+merged_df_C['nueva_var'] = ((merged_df_C[( '01PHD.PRF073.PV')] * (merged_df_C[( '01PHD.PAREX.L2A')])) / merged_df_C[( '01PHD.PRT230.PV')]) 
+merged_df_C['nueva_var2'] =  -0.001* (merged_df_C['01PHD.SUAA236.PV']) + 99.543
+
+merged_df_C['nueva_var28'] =  0.04* (merged_df_C['01PHD.SUAA238.PV']) + 99.3
+merged_df_C['nueva_var3'] =  1.1559* (merged_df_C['01PHD.PAREX.L2A']) + 98.906
+#merged_df_C['nueva_var3'] =  -1.7105* (merged_df_C['01PHD.PAREX.L2A']) + 100.44
+merged_df_C['nueva_var4'] = (2.630 * merged_df_C['nueva_var3']) + (0.003* merged_df_C['01PHD.PRF073.PV']) - 162.305
+merged_df_C['Tendencia L2A'] = merged_df_C[( '01PHD.PAREX.L2A')].diff().rolling(5).mean()
+#merged_df_C = merged_df_C[(merged_df_C['01ILB.U7K02.GM1'] >= 99.25) & (merged_df_C['01ILB.U7K02.GM1'] <= 99.8)]
+merged_df_C['Tendencia L2A'] = merged_df_C['Tendencia L2A'].fillna(0)
+merged_df_C=merged_df_C.dropna()
+merged_df_C
+
+X_test_URZ13_test_realtime, y_test_URZ13_test_realtime = merged_df_C[model_vars['x']].values, merged_df_C[model_vars['y']].values
+
+
+# training all the model on the training dataset
+model_1.fit(X_train, y_train)
+model_2.fit(X_train, y_train)
+model_3.fit(X_train, y_train)
+model_4.fit(X_train, y_train)
+model_rf.fit(X_train, y_train)
+model_gb.fit(X_train, y_train)
+model_xgb.fit(X_train, y_train)
+model_lgb.fit(X_train, y_train)
+model_cat.fit(X_train, y_train)
+model_ada.fit(X_train, y_train)
+model_voting.fit(X_train, y_train)
+
+# Asignar pesos personalizados a los modelos base
+weights = [0.1,  0.6, 0.3]  # Por ejemplo, asignamos un peso de 0.4 al modelo_rf, 0.3 a model_gb y 0.3 a model_lr
+
+# Crear el ensemble con pesos personalizados
+weighted_ensemble = VotingRegressor(
+    estimators=[
+        ('rf', model_1),
+        ('gb', model_gb),
+        ('lr', model_xgb)
+    ],
+    weights=weights
+)
+
+# Entrenar el ensemble con pesos personalizados
+weighted_ensemble.fit(X_train, y_train)
+
+# Predecir en el conjunto de prueba
+pred_weighted = weighted_ensemble.predict(X_test_URZ13_test_realtime)
+
+mse = mean_squared_error(y_test_URZ13_test_realtime, pred_weighted)
+mae = mean_absolute_error(y_test_URZ13_test_realtime, pred_weighted)
+r2 = r2_score(y_test_URZ13_test_realtime, pred_weighted)
+
+# Mostrar los resultados
+print("Error Cuadrático Medio (MSE):", mse)
+print("Error Absoluto Medio (MAE):", mae)
+print("Coeficiente de Determinación R²:", r2)
